@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Burlington VT Business Map</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+            background: #f8f9fa;
+        }
+
+        /* Custom marker styles */
+        .custom-marker {
+            background-color: #fff;
+            border: 3px solid;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        .custom-marker:hover {
+            transform: scale(1.15);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            z-index: 1000 !important;
+        }
+
+        .custom-marker::after {
+            content: '';
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* Category colors */
+        .marker-food { border-color: #FF6B6B; color: #FF6B6B; }
+        .marker-coffee { border-color: #51CF66; color: #51CF66; }
+        .marker-retail { border-color: #4DABF7; color: #4DABF7; }
+        .marker-outdoor { border-color: #9775FA; color: #9775FA; }
+        .marker-arts { border-color: #FFB84D; color: #FFB84D; }
+
+        /* Popup styles */
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .leaflet-popup-content {
+            margin: 0;
+            min-width: 220px;
+        }
+
+        .popup-header {
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .popup-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0 0 4px 0;
+            line-height: 1.3;
+        }
+
+        .popup-category {
+            display: inline-block;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.25);
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .popup-body {
+            padding: 16px;
+            background: white;
+        }
+
+        .popup-address {
+            display: flex;
+            align-items: flex-start;
+            color: #495057;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .popup-address::before {
+            content: '📍';
+            margin-right: 8px;
+            font-size: 16px;
+        }
+
+        .leaflet-popup-tip {
+            box-shadow: 0 3px 14px rgba(0,0,0,0.1);
+        }
+
+        /* Legend */
+        #legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            z-index: 1000;
+            min-width: 220px;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        #legend h3 {
+            margin: 0 0 16px 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #212529;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #legend h3::before {
+            content: '🗺️';
+            font-size: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 12px 0;
+            font-size: 14px;
+            color: #495057;
+            transition: transform 0.2s ease;
+            cursor: pointer;
+        }
+
+        .legend-item:hover {
+            transform: translateX(4px);
+        }
+
+        .legend-marker {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 3px solid;
+            margin-right: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .legend-marker::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .legend-text {
+            font-weight: 600;
+        }
+
+        .legend-count {
+            margin-left: auto;
+            background: #f1f3f5;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #495057;
+        }
+
+        /* Info banner */
+        #info-banner {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 16px 24px;
+            border-radius: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        #info-banner span {
+            font-size: 14px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        #info-banner .count {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 16px;
+            font-weight: 700;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            #legend {
+                top: 10px;
+                right: 10px;
+                padding: 16px;
+                min-width: 180px;
+            }
+
+            #legend h3 {
+                font-size: 16px;
+            }
+
+            .legend-item {
+                font-size: 13px;
+            }
+
+            #info-banner {
+                bottom: 10px;
+                padding: 12px 20px;
+            }
+        }
+
+        /* Loading animation */
+        .leaflet-tile-container {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="legend">
+        <h3>Business Categories</h3>
+        <div class="legend-item" data-category="food">
+            <div class="legend-marker marker-food"></div>
+            <span class="legend-text">Food & Dining</span>
+            <span class="legend-count">17</span>
+        </div>
+        <div class="legend-item" data-category="coffee">
+            <div class="legend-marker marker-coffee"></div>
+            <span class="legend-text">Coffee & Cafes</span>
+            <span class="legend-count">7</span>
+        </div>
+        <div class="legend-item" data-category="retail">
+            <div class="legend-marker marker-retail"></div>
+            <span class="legend-text">Retail & Shopping</span>
+            <span class="legend-count">15</span>
+        </div>
+        <div class="legend-item" data-category="outdoor">
+            <div class="legend-marker marker-outdoor"></div>
+            <span class="legend-text">Outdoor & Sports</span>
+            <span class="legend-count">5</span>
+        </div>
+        <div class="legend-item" data-category="arts">
+            <div class="legend-marker marker-arts"></div>
+            <span class="legend-text">Arts & Culture</span>
+            <span class="legend-count">6</span>
+        </div>
+    </div>
+    <div id="info-banner">
+        <span>📍 Showing <span class="count">50</span> businesses in Burlington, VT</span>
+    </div>
+
+    <script>
+        // Initialize map centered on Burlington
+        const map = L.map('map', {
+            zoomControl: true,
+            scrollWheelZoom: true,
+            doubleClickZoom: true,
+            boxZoom: true,
+            keyboard: true,
+            dragging: true,
+            minZoom: 12,
+            maxZoom: 18
+        });
+
+        // Add custom tile layer with better styling
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19,
+            className: 'map-tiles'
+        }).addTo(map);
+
+        // Category mapping
+        const categories = {
+            food: { label: 'Food & Dining', color: '#FF6B6B' },
+            coffee: { label: 'Coffee & Cafes', color: '#51CF66' },
+            retail: { label: 'Retail & Shopping', color: '#4DABF7' },
+            outdoor: { label: 'Outdoor & Sports', color: '#9775FA' },
+            arts: { label: 'Arts & Culture', color: '#FFB84D' }
+        };
+
+        // Business data with user-adjusted coordinates
+        const businesses = [
+            { name: "Tradewinds Imports", address: "110 Church St", lat: 44.47736635037184, lng: -73.21240782737733, category: "retail" },
+            { name: "Earthbound Trading Co.", address: "24 Church St", lat: 44.47965141779853, lng: -73.21255803108217, category: "retail" },
+            { name: "Golden Hour Gift Co.", address: "87 Church St", lat: 44.477886909616444, lng: -73.212708234787, category: "retail" },
+            { name: "Ben & Jerry's", address: "36 Church St", lat: 44.47942942187273, lng: -73.21255803108217, category: "food" },
+            { name: "JSkis", address: "247 Main St", lat: 44.47587737218779, lng: -73.20944130420686, category: "outdoor" },
+            { name: "Kru Coffee", address: "2 Church St", lat: 44.48031357304285, lng: -73.21260631084444, category: "coffee" },
+            { name: "Black Cap Coffee & Bakery", address: "42 Church St", lat: 44.47908877130964, lng: -73.21252048015596, category: "coffee" },
+            { name: "Muddy Waters", address: "184 Main St", lat: 44.47613383129296, lng: -73.21191966533662, category: "coffee" },
+            { name: "August First Bakery & Cafe", address: "149 S Champlain St", lat: 44.47557880643646, lng: -73.2173001766205, category: "coffee" },
+            { name: "Burlington Bay Market & Cafe", address: "125 Battery St", lat: 44.47654339797436, lng: -73.2191026210785, category: "food" },
+            { name: "Burlington Bagel Bakery", address: "93 Church St", lat: 44.47774911497424, lng: -73.21271896362306, category: "coffee" },
+            { name: "Three Needs Taproom & Pizza", address: "185 Pearl St", lat: 44.480348020219886, lng: -73.21171581745149, category: "food" },
+            { name: "Homeport", address: "52 Church St", lat: 44.478732808483976, lng: -73.21249902248384, category: "food" },
+            { name: "Outdoor Gear Exchange", address: "37 Church St", lat: 44.479077288671746, lng: -73.21294426918031, category: "outdoor" },
+            { name: "Earth Prime Comics", address: "154 Church St", lat: 44.47617976414802, lng: -73.21235418319704, category: "arts" },
+            { name: "The Herb Closet", address: "196 Pearl St", lat: 44.480559568227, lng: -73.211131820542, category: "retail" },
+            { name: "Crow Bookshop", address: "14 Church St", lat: 44.479976755129314, lng: -73.21257948875429, category: "arts" },
+            { name: "Vivid Coffee Roasters", address: "150 Cherry St", lat: 44.47943707691871, lng: -73.21214497089387, category: "coffee" },
+            { name: "Ecco Clothes", address: "81 Church St", lat: 44.478025735002, lng: -73.212720896462, category: "retail" },
+            { name: "Dudley H. Davis Center (UVM)", address: "590 Main St", lat: 44.475946271759604, lng: -73.19652915000917, category: "arts" },
+            { name: "Ladybug Creative", address: "207 College St", lat: 44.4770027216739, lng: -73.21148514747621, category: "arts" },
+            { name: "The Cosmic Grind", address: "104 Church St", lat: 44.477485007667106, lng: -73.21241319179536, category: "coffee" },
+            { name: "Old Gold", address: "151 Cherry St", lat: 44.47920359756436, lng: -73.21210205554964, category: "retail" },
+            { name: "Folino's Pizza", address: "71 S Union St", lat: 44.478131877065756, lng: -73.20968806743623, category: "food" },
+            { name: "American Flatbread", address: "115 St Paul St", lat: 44.476501293121004, lng: -73.21422636508943, category: "food" },
+            { name: "Burlington Records", address: "194 College St", lat: 44.47722089916459, lng: -73.21208596229555, category: "arts" },
+            { name: "Dobra Tea", address: "125 S Winooski Ave", lat: 44.47681516493334, lng: -73.21123838424684, category: "coffee" },
+            { name: "Vermont Teddy Bear", address: "74 Church St", lat: 44.47843808493118, lng: -73.2124561071396, category: "retail" },
+            { name: "Asiana Noodle Shop", address: "88 Church St", lat: 44.47792135822616, lng: -73.21244001388551, category: "food" },
+            { name: "Flora & Fauna Marketplace", address: "70 Church St", lat: 44.47855674004706, lng: -73.21246683597566, category: "retail" },
+            { name: "Burton Flagship Store", address: "180 Queen City Park Rd", lat: 44.4489523, lng: -73.219437, category: "outdoor" },
+            { name: "Dirt Chic", address: "67 Main St", lat: 44.475663017444056, lng: -73.21672081947328, category: "retail" },
+            { name: "Home & Garden Vermont", address: "206 College St", lat: 44.47722472683259, lng: -73.21161389350893, category: "retail" },
+            { name: "Zinnia", address: "57 Church St", lat: 44.47867156734879, lng: -73.21282625198366, category: "retail" },
+            { name: "Sherpa Kitchen", address: "119 College St", lat: 44.476937651036295, lng: -73.2151222229004, category: "food" },
+            { name: "Patagonia Burlington", address: "191 College St", lat: 44.47699889399135, lng: -73.21196258068086, category: "outdoor" },
+            { name: "ECHO Leahy Center", address: "1 College St", lat: 44.476528087122105, lng: -73.22103381156923, category: "arts" },
+            { name: "The Friendly Toast", address: "86 St Paul St", lat: 44.47751562886543, lng: -73.21396350860597, category: "food" },
+            { name: "Henry's Diner", address: "155 Bank St", lat: 44.47802853154849, lng: -73.21356117725374, category: "food" },
+            { name: "The Boardroom", address: "3 Mill St", lat: 44.488300946193924, lng: -73.1861436367035, category: "arts" },
+            { name: "The Daily Planet", address: "15 Center St", lat: 44.47784863335958, lng: -73.2116460800171, category: "food" },
+            { name: "Phoenix Books", address: "89 Church St", lat: 44.477820373505, lng: -73.212703783021, category: "arts" },
+            { name: "Top of the Block Cafe", address: "2 Church St", lat: 44.48018343907948, lng: -73.21259021759035, category: "food" },
+            { name: "Lake Champlain Chocolates", address: "65 Church St", lat: 44.478484015972406, lng: -73.21279942989351, category: "food" },
+            { name: "Skirack", address: "85 Main St", lat: 44.4756132564088, lng: -73.21592688560487, category: "outdoor" },
+            { name: "Zero Gravity Brewery", address: "716 Pine St", lat: 44.459409633463, lng: -73.214381685502, category: "food" },
+            { name: "Battery St. Jeans", address: "115 College St", lat: 44.47693425475, lng: -73.21531397496, category: "retail" },
+            { name: "Skida", address: "16 Kilburn St", lat: 44.471161385936895, lng: -73.2144194841385, category: "retail" },
+            { name: "ReSOURCE", address: "339 Pine St", lat: 44.469871313576846, lng: -73.21633458137514, category: "retail" },
+            { name: "The Skinny Pancake", address: "60 Lake St", lat: 44.47704099848566, lng: -73.21953177452089, category: "food" }
+        ];
+
+        // Create custom marker icons
+        function createCustomIcon(category) {
+            return L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class="custom-marker marker-${category}"></div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+                popupAnchor: [0, -14]
+            });
+        }
+
+        // Add markers with popups
+        const markers = [];
+        businesses.forEach((business, index) => {
+            const marker = L.marker([business.lat, business.lng], {
+                icon: createCustomIcon(business.category),
+                title: business.name
+            }).addTo(map);
+
+            const popupContent = `
+                <div class="popup-header">
+                    <h3 class="popup-title">${business.name}</h3>
+                    <span class="popup-category">${categories[business.category].label}</span>
+                </div>
+                <div class="popup-body">
+                    <p class="popup-address">${business.address}<br>Burlington, VT 05401</p>
+                </div>
+            `;
+
+            marker.bindPopup(popupContent, {
+                maxWidth: 280,
+                className: 'custom-popup'
+            });
+
+            markers.push(marker);
+        });
+
+        // Fit map to show all markers
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.08));
+
+        // Add legend interactivity
+        document.querySelectorAll('.legend-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const category = this.dataset.category;
+                // Filter and show only markers of selected category
+                markers.forEach((marker, index) => {
+                    if (businesses[index].category === category) {
+                        marker.openPopup();
+                    }
+                });
+            });
+        });
+
+        // Add scale control
+        L.control.scale({
+            imperial: true,
+            metric: false,
+            position: 'bottomleft'
+        }).addTo(map);
+    </script>
+</body>
+</html>
